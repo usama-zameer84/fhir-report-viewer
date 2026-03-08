@@ -9,6 +9,12 @@
     .header { background: #1e2130; border-left: 4px solid #00d4aa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
     .header h1 { margin: 0; color: #00d4aa; font-size: 1.4em; }
     .header p { margin: 5px 0 0; color: #888; font-size: 0.9em; }
+    .header-actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
+    .btn-primary { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa; }
+    .btn-secondary { background: #7eb8f722; color: #7eb8f7; border: 1px solid #7eb8f7; }
+    .btn-muted { background: #2a2d3e; color: #888; border: 1px solid #3a3d4e; }
+    .btn:hover { opacity: 0.8; }
     .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; }
     .badge-final { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa; }
     .badge-prelim { background: #f0a50022; color: #f0a500; border: 1px solid #f0a500; }
@@ -30,21 +36,21 @@
     .sig-not_in_clinvar { color: #888; }
     .loading { text-align: center; padding: 60px; color: #888; }
     .error { background: #ff4d4d22; border: 1px solid #ff4d4d; border-radius: 8px; padding: 20px; color: #ff4d4d; }
-    .loinc-map { font-size: 0.75em; color: #666; }
+    .footer { text-align: center; margin-top: 30px; font-size: 0.75em; color: #444; }
+    .footer a { color: #555; }
   </style>
 </head>
 <body>
 <div class="container">
-  <div id="app"><div class="loading">Loading FHIR Report...</div></div>
+  <div id="app"><div class="loading">⏳ Loading FHIR Report...</div></div>
 </div>
 <script>
 const LOINC = {
   '62374-4': 'Genome Build', '47999-8': 'Chromosome',
-  '81254-5': 'Position', '69547-8': 'REF Allele',
-  '69551-1': 'ALT Allele', '53037-8': 'Clinical Significance',
+  '81254-5': 'Position',     '69547-8': 'REF Allele',
+  '69551-1': 'ALT Allele',   '53037-8': 'Clinical Significance',
   '69548-6': 'Variant Assessment'
 };
-
 const BUILD = { 'LA26806-2': 'GRCh38', 'LA14029-5': 'GRCh37' };
 
 function getVal(comp) {
@@ -54,25 +60,26 @@ function getVal(comp) {
     const c = comp.valueCodeableConcept.coding[0].code;
     return BUILD[c] || c;
   }
-  if (comp.valueRange?.low?.value) return comp.valueRange.low.value.toLocaleString();
+  if (comp.valueRange?.low?.value !== undefined) return Number(comp.valueRange.low.value).toLocaleString();
   return '—';
 }
 
 function sigClass(sig) {
-  return 'sig-' + (sig || '').replace(/ /g,'_').toLowerCase();
+  return 'sig-' + (sig || '').replace(/ /g, '_').toLowerCase();
 }
 
-function render(report) {
+function render(report, reportId) {
   const obs = report.contained || [];
   const issued = report.issued ? new Date(report.issued).toLocaleString() : '—';
   const sampleId = report.identifier?.[0]?.value || report.id;
   const patientId = report.subject?.display || report.subject?.identifier?.value || '—';
+  const hapiBase = `https://hapi.fhir.org/baseR4/DiagnosticReport/${reportId}`;
 
   const variantsHtml = obs.map((o, i) => {
     const comps = o.component || [];
     const sig = comps.find(c => c.code?.coding?.[0]?.code === '53037-8');
     const sigVal = sig ? getVal(sig) : 'not_in_clinvar';
-    const status = o.status === 'final'
+    const statusBadge = o.status === 'final'
       ? '<span class="badge badge-final">PASS</span>'
       : '<span class="badge badge-prelim">LOW QUAL</span>';
 
@@ -80,17 +87,16 @@ function render(report) {
       .filter(c => c.code?.coding?.[0]?.code !== '53037-8')
       .map(c => {
         const code = c.code?.coding?.[0]?.code;
-        const label = LOINC[code] || code;
-        return `<div class="comp-item"><label>${label}</label><span>${getVal(c)}</span></div>`;
+        return `<div class="comp-item"><label>${LOINC[code] || code}</label><span>${getVal(c)}</span></div>`;
       }).join('');
 
     return `
       <div class="variant">
         <div class="variant-header">
-          <span class="variant-title">Variant ${i+1}</span>
+          <span class="variant-title">Variant ${i + 1}</span>
           <div>
-            <span class="${sigClass(sigVal)}">${sigVal.replace(/_/g,' ')}</span>
-            ${status}
+            <span class="${sigClass(sigVal)}">${sigVal.replace(/_/g, ' ')}</span>
+            ${statusBadge}
           </div>
         </div>
         <div class="comp-grid">${compItems}</div>
@@ -100,7 +106,12 @@ function render(report) {
   document.getElementById('app').innerHTML = `
     <div class="header">
       <h1>🧬 Genomics Report <span class="badge badge-final">${report.status?.toUpperCase()}</span></h1>
-      <p>Master HL7 Genetic Variant Reporting Panel · LOINC 81247-9</p>
+      <p>Master HL7 Genetic Variant Reporting Panel · LOINC 81247-9 · FHIR R4</p>
+      <div class="header-actions">
+        <a class="btn btn-primary" href="${hapiBase}?_format=json" target="_blank">📄 Raw JSON</a>
+        <a class="btn btn-secondary" href="${hapiBase}?_format=html" target="_blank">🔗 View on HAPI FHIR</a>
+        <a class="btn btn-muted" href="https://hapi.fhir.org/baseR4/DiagnosticReport/${reportId}" target="_blank">🏥 Original FHIR Report</a>
+      </div>
     </div>
     <div class="card">
       <h2>Report Details</h2>
@@ -108,12 +119,19 @@ function render(report) {
         <div class="meta-item"><label>Sample ID</label><span>${sampleId}</span></div>
         <div class="meta-item"><label>Patient</label><span>${patientId}</span></div>
         <div class="meta-item"><label>Issued</label><span>${issued}</span></div>
+        <div class="meta-item"><label>HAPI Report ID</label><span>${reportId}</span></div>
         <div class="meta-item"><label>Variants Found</label><span>${obs.length}</span></div>
+        <div class="meta-item"><label>Profile</label><span>HL7 Genomics Reporting IG</span></div>
       </div>
     </div>
     <div class="card">
       <h2>Variants (${obs.length})</h2>
       ${variantsHtml || '<p style="color:#888">No variants found</p>'}
+    </div>
+    <div class="footer">
+      Generated by <a href="https://github.com" target="_blank">VCF → FHIR ETL Pipeline</a> ·
+      Powered by <a href="https://hapi.fhir.org" target="_blank">HAPI FHIR R4</a> ·
+      <a href="${hapiBase}" target="_blank">Direct Report Link</a>
     </div>`;
 }
 
@@ -121,15 +139,15 @@ async function load() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get('id');
   if (!id) {
-    document.getElementById('app').innerHTML = '<div class="error">No report ID provided. Use ?id=HAPI_REPORT_ID in the URL.</div>';
+    document.getElementById('app').innerHTML = '<div class="error">⚠️ No report ID provided. Use <code>?id=HAPI_REPORT_ID</code> in the URL.</div>';
     return;
   }
   try {
     const res = await fetch(`https://hapi.fhir.org/baseR4/DiagnosticReport/${id}?_format=json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    render(await res.json());
-  } catch(e) {
-    document.getElementById('app').innerHTML = `<div class="error">Failed to load report: ${e.message}</div>`;
+    render(await res.json(), id);
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<div class="error">❌ Failed to load report: ${e.message}</div>`;
   }
 }
 load();
