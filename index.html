@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FHIR Genomics Report Viewer</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .header { background: #1e2130; border-left: 4px solid #00d4aa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .header h1 { margin: 0; color: #00d4aa; font-size: 1.4em; }
+    .header p { margin: 5px 0 0; color: #888; font-size: 0.9em; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; }
+    .badge-final { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa; }
+    .badge-prelim { background: #f0a50022; color: #f0a500; border: 1px solid #f0a500; }
+    .card { background: #1e2130; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 1px solid #2a2d3e; }
+    .card h2 { margin: 0 0 15px; font-size: 1em; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .meta-item label { display: block; font-size: 0.75em; color: #666; margin-bottom: 3px; }
+    .meta-item span { font-size: 0.95em; color: #e0e0e0; }
+    .variant { border: 1px solid #2a2d3e; border-radius: 6px; padding: 15px; margin-bottom: 10px; }
+    .variant-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .variant-title { font-weight: bold; color: #7eb8f7; }
+    .comp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .comp-item label { display: block; font-size: 0.7em; color: #666; margin-bottom: 2px; }
+    .comp-item span { font-size: 0.9em; }
+    .sig-pathogenic { color: #ff4d4d; }
+    .sig-likely_pathogenic { color: #ff8c00; }
+    .sig-uncertain_significance { color: #f0a500; }
+    .sig-benign, .sig-likely_benign { color: #00d4aa; }
+    .sig-not_in_clinvar { color: #888; }
+    .loading { text-align: center; padding: 60px; color: #888; }
+    .error { background: #ff4d4d22; border: 1px solid #ff4d4d; border-radius: 8px; padding: 20px; color: #ff4d4d; }
+    .loinc-map { font-size: 0.75em; color: #666; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div id="app"><div class="loading">Loading FHIR Report...</div></div>
+</div>
+<script>
+const LOINC = {
+  '62374-4': 'Genome Build', '47999-8': 'Chromosome',
+  '81254-5': 'Position', '69547-8': 'REF Allele',
+  '69551-1': 'ALT Allele', '53037-8': 'Clinical Significance',
+  '69548-6': 'Variant Assessment'
+};
+
+const BUILD = { 'LA26806-2': 'GRCh38', 'LA14029-5': 'GRCh37' };
+
+function getVal(comp) {
+  if (comp.valueString) return comp.valueString;
+  if (comp.valueCodeableConcept?.text) return comp.valueCodeableConcept.text;
+  if (comp.valueCodeableConcept?.coding?.[0]) {
+    const c = comp.valueCodeableConcept.coding[0].code;
+    return BUILD[c] || c;
+  }
+  if (comp.valueRange?.low?.value) return comp.valueRange.low.value.toLocaleString();
+  return '—';
+}
+
+function sigClass(sig) {
+  return 'sig-' + (sig || '').replace(/ /g,'_').toLowerCase();
+}
+
+function render(report) {
+  const obs = report.contained || [];
+  const issued = report.issued ? new Date(report.issued).toLocaleString() : '—';
+  const sampleId = report.identifier?.[0]?.value || report.id;
+  const patientId = report.subject?.display || report.subject?.identifier?.value || '—';
+
+  const variantsHtml = obs.map((o, i) => {
+    const comps = o.component || [];
+    const sig = comps.find(c => c.code?.coding?.[0]?.code === '53037-8');
+    const sigVal = sig ? getVal(sig) : 'not_in_clinvar';
+    const status = o.status === 'final'
+      ? '<span class="badge badge-final">PASS</span>'
+      : '<span class="badge badge-prelim">LOW QUAL</span>';
+
+    const compItems = comps
+      .filter(c => c.code?.coding?.[0]?.code !== '53037-8')
+      .map(c => {
+        const code = c.code?.coding?.[0]?.code;
+        const label = LOINC[code] || code;
+        return `<div class="comp-item"><label>${label}</label><span>${getVal(c)}</span></div>`;
+      }).join('');
+
+    return `
+      <div class="variant">
+        <div class="variant-header">
+          <span class="variant-title">Variant ${i+1}</span>
+          <div>
+            <span class="${sigClass(sigVal)}">${sigVal.replace(/_/g,' ')}</span>
+            ${status}
+          </div>
+        </div>
+        <div class="comp-grid">${compItems}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <h1>🧬 Genomics Report <span class="badge badge-final">${report.status?.toUpperCase()}</span></h1>
+      <p>Master HL7 Genetic Variant Reporting Panel · LOINC 81247-9</p>
+    </div>
+    <div class="card">
+      <h2>Report Details</h2>
+      <div class="meta-grid">
+        <div class="meta-item"><label>Sample ID</label><span>${sampleId}</span></div>
+        <div class="meta-item"><label>Patient</label><span>${patientId}</span></div>
+        <div class="meta-item"><label>Issued</label><span>${issued}</span></div>
+        <div class="meta-item"><label>Variants Found</label><span>${obs.length}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Variants (${obs.length})</h2>
+      ${variantsHtml || '<p style="color:#888">No variants found</p>'}
+    </div>`;
+}
+
+async function load() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  if (!id) {
+    document.getElementById('app').innerHTML = '<div class="error">No report ID provided. Use ?id=HAPI_REPORT_ID in the URL.</div>';
+    return;
+  }
+  try {
+    const res = await fetch(`https://hapi.fhir.org/baseR4/DiagnosticReport/${id}?_format=json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    render(await res.json());
+  } catch(e) {
+    document.getElementById('app').innerHTML = `<div class="error">Failed to load report: ${e.message}</div>`;
+  }
+}
+load();
+</script>
+</body>
+</html>
