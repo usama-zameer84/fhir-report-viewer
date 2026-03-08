@@ -1,156 +1,883 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>FHIR Genomics Report Viewer</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; margin: 0; padding: 20px; }
-    .container { max-width: 900px; margin: 0 auto; }
-    .header { background: #1e2130; border-left: 4px solid #00d4aa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-    .header h1 { margin: 0; color: #00d4aa; font-size: 1.4em; }
-    .header p { margin: 5px 0 0; color: #888; font-size: 0.9em; }
-    .header-actions { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; font-size: 0.82em; font-weight: 600; text-decoration: none; cursor: pointer; border: none; }
-    .btn-primary { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa; }
-    .btn-secondary { background: #7eb8f722; color: #7eb8f7; border: 1px solid #7eb8f7; }
-    .btn-muted { background: #2a2d3e; color: #888; border: 1px solid #3a3d4e; }
-    .btn:hover { opacity: 0.8; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75em; font-weight: bold; margin-left: 10px; }
-    .badge-final { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa; }
-    .badge-prelim { background: #f0a50022; color: #f0a500; border: 1px solid #f0a500; }
-    .card { background: #1e2130; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 1px solid #2a2d3e; }
-    .card h2 { margin: 0 0 15px; font-size: 1em; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .meta-item label { display: block; font-size: 0.75em; color: #666; margin-bottom: 3px; }
-    .meta-item span { font-size: 0.95em; color: #e0e0e0; }
-    .variant { border: 1px solid #2a2d3e; border-radius: 6px; padding: 15px; margin-bottom: 10px; }
-    .variant-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .variant-title { font-weight: bold; color: #7eb8f7; }
-    .comp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .comp-item label { display: block; font-size: 0.7em; color: #666; margin-bottom: 2px; }
-    .comp-item span { font-size: 0.9em; }
-    .sig-pathogenic { color: #ff4d4d; }
-    .sig-likely_pathogenic { color: #ff8c00; }
-    .sig-uncertain_significance { color: #f0a500; }
-    .sig-benign, .sig-likely_benign { color: #00d4aa; }
-    .sig-not_in_clinvar { color: #888; }
-    .loading { text-align: center; padding: 60px; color: #888; }
-    .error { background: #ff4d4d22; border: 1px solid #ff4d4d; border-radius: 8px; padding: 20px; color: #ff4d4d; }
-    .footer { text-align: center; margin-top: 30px; font-size: 0.75em; color: #444; }
-    .footer a { color: #555; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    .header {
+      background: #1e2130;
+      border-left: 4px solid #00d4aa;
+      padding: 22px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      margin: 0 0 4px;
+      color: #00d4aa;
+      font-size: 1.4em;
+    }
+
+    .header p {
+      margin: 0;
+      color: #888;
+      font-size: 0.85em;
+    }
+
+    .header-actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.82em;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: opacity .15s;
+    }
+
+    .btn:hover {
+      opacity: 0.75;
+    }
+
+    .btn-primary {
+      background: #00d4aa22;
+      color: #00d4aa;
+      border: 1px solid #00d4aa;
+    }
+
+    .btn-secondary {
+      background: #7eb8f722;
+      color: #7eb8f7;
+      border: 1px solid #7eb8f7;
+    }
+
+    .btn-muted {
+      background: #2a2d3e;
+      color: #888;
+      border: 1px solid #3a3d4e;
+    }
+
+    .btn-danger {
+      background: #ff4d4d22;
+      color: #ff4d4d;
+      border: 1px solid #ff4d4d;
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.72em;
+      font-weight: bold;
+    }
+
+    .badge-final {
+      background: #00d4aa22;
+      color: #00d4aa;
+      border: 1px solid #00d4aa;
+    }
+
+    .badge-prelim {
+      background: #f0a50022;
+      color: #f0a500;
+      border: 1px solid #f0a500;
+    }
+
+    /* STATS BAR */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #1e2130;
+      border: 1px solid #2a2d3e;
+      border-radius: 8px;
+      padding: 16px 18px;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 2em;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.72em;
+      color: #888;
+      margin-top: 5px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    .stat-total .stat-value {
+      color: #7eb8f7;
+    }
+
+    .stat-pass .stat-value {
+      color: #00d4aa;
+    }
+
+    .stat-path .stat-value {
+      color: #ff4d4d;
+    }
+
+    .stat-vus .stat-value {
+      color: #f0a500;
+    }
+
+    .stat-benign .stat-value {
+      color: #a0c878;
+    }
+
+    .stat-noclinvar .stat-value {
+      color: #666;
+    }
+
+    /* CARDS */
+    .card {
+      background: #1e2130;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #2a2d3e;
+    }
+
+    .card h2 {
+      margin: 0 0 15px;
+      font-size: 0.8em;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* META GRID */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .meta-item label {
+      display: block;
+      font-size: 0.72em;
+      color: #666;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    .meta-item span {
+      font-size: 0.92em;
+      color: #e0e0e0;
+      font-family: monospace;
+    }
+
+    .meta-item .copy-btn {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: 0.8em;
+      margin-left: 6px;
+      padding: 0;
+    }
+
+    .meta-item .copy-btn:hover {
+      color: #00d4aa;
+    }
+
+    /* PATIENT PANEL */
+    .patient-panel {
+      background: #161926;
+      border: 1px solid #00d4aa33;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .patient-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #00d4aa22;
+      border: 2px solid #00d4aa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3em;
+      flex-shrink: 0;
+    }
+
+    .patient-info label {
+      font-size: 0.7em;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      display: block;
+    }
+
+    .patient-info .pid {
+      font-size: 1em;
+      font-weight: bold;
+      color: #00d4aa;
+      font-family: monospace;
+    }
+
+    .patient-info .psys {
+      font-size: 0.78em;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    /* FILTER BAR */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-bar input {
+      background: #161926;
+      border: 1px solid #2a2d3e;
+      color: #e0e0e0;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85em;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .filter-bar input:focus {
+      outline: none;
+      border-color: #00d4aa;
+    }
+
+    .filter-bar select {
+      background: #161926;
+      border: 1px solid #2a2d3e;
+      color: #e0e0e0;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85em;
+      cursor: pointer;
+    }
+
+    .filter-bar select:focus {
+      outline: none;
+      border-color: #00d4aa;
+    }
+
+    .filter-count {
+      font-size: 0.8em;
+      color: #888;
+      white-space: nowrap;
+    }
+
+    /* VARIANT CARDS */
+    .variant {
+      border: 1px solid #2a2d3e;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 10px;
+      transition: border-color .2s;
+    }
+
+    .variant:hover {
+      border-color: #3a3d5e;
+    }
+
+    .variant.highlight-path {
+      border-left: 3px solid #ff4d4d;
+    }
+
+    .variant.highlight-lpath {
+      border-left: 3px solid #ff8c00;
+    }
+
+    .variant.highlight-benign {
+      border-left: 3px solid #a0c878;
+    }
+
+    .variant-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .variant-title {
+      font-weight: bold;
+      color: #7eb8f7;
+      font-size: 0.95em;
+    }
+
+    .variant-rsid {
+      font-size: 0.78em;
+      color: #555;
+      margin-top: 3px;
+      font-family: monospace;
+    }
+
+    .rsid-link {
+      color: #7eb8f7;
+      text-decoration: none;
+      font-size: 0.85em;
+    }
+
+    .rsid-link:hover {
+      text-decoration: underline;
+      color: #00d4aa;
+    }
+
+    .comp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .comp-item label {
+      display: block;
+      font-size: 0.68em;
+      color: #555;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .comp-item .loinc-code {
+      font-size: 0.6em;
+      color: #3a3d5e;
+      display: block;
+      font-family: monospace;
+    }
+
+    .comp-item span.val {
+      font-size: 0.88em;
+      font-family: monospace;
+    }
+
+    /* SIG COLOURS */
+    .sig-pathogenic {
+      color: #ff4d4d;
+      font-weight: bold;
+    }
+
+    .sig-likely_pathogenic {
+      color: #ff8c00;
+      font-weight: bold;
+    }
+
+    .sig-uncertain_significance {
+      color: #f0a500;
+    }
+
+    .sig-benign {
+      color: #a0c878;
+    }
+
+    .sig-likely_benign {
+      color: #a0c878;
+    }
+
+    .sig-not_in_clinvar {
+      color: #555;
+    }
+
+    .sig-lookup_error {
+      color: #ff4d4d66;
+    }
+
+    /* LOINC TABLE */
+    .loinc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82em;
+    }
+
+    .loinc-table th {
+      text-align: left;
+      color: #666;
+      padding: 6px 10px;
+      border-bottom: 1px solid #2a2d3e;
+      font-size: 0.75em;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    .loinc-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #1a1d2e;
+      font-family: monospace;
+    }
+
+    .loinc-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .loinc-table .code {
+      color: #7eb8f7;
+    }
+
+    .loinc-table .desc {
+      color: #aaa;
+    }
+
+    /* MISC */
+    .section-toggle {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .section-toggle:hover {
+      color: #00d4aa;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #888;
+    }
+
+    .error {
+      background: #ff4d4d22;
+      border: 1px solid #ff4d4d;
+      border-radius: 8px;
+      padding: 20px;
+      color: #ff4d4d;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.72em;
+      color: #444;
+    }
+
+    .footer a {
+      color: #555;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      color: #00d4aa;
+    }
+
+    .tag {
+      display: inline-block;
+      background: #2a2d3e;
+      color: #888;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.72em;
+      margin-left: 4px;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 30px;
+      color: #555;
+      font-size: 0.9em;
+    }
   </style>
 </head>
+
 <body>
-<div class="container">
-  <div id="app"><div class="loading">⏳ Loading FHIR Report...</div></div>
-</div>
-<script>
-const LOINC = {
-  '62374-4': 'Genome Build', '47999-8': 'Chromosome',
-  '81254-5': 'Position',     '69547-8': 'REF Allele',
-  '69551-1': 'ALT Allele',   '53037-8': 'Clinical Significance',
-  '69548-6': 'Variant Assessment'
-};
-const BUILD = { 'LA26806-2': 'GRCh38', 'LA14029-5': 'GRCh37' };
+  <div class="container">
+    <div id="app">
+      <div class="loading">⏳ Loading FHIR Report...</div>
+    </div>
+  </div>
+  <script>
+    const LOINC_MAP = {
+      '62374-4': { label: 'Genome Build', desc: 'Human reference sequence assembly version' },
+      '47999-8': { label: 'Chromosome', desc: 'Cytogenetic (chromosome) location' },
+      '81254-5': { label: 'Genomic Position', desc: 'Exact start-end position of variant' },
+      '69547-8': { label: 'REF Allele', desc: 'Reference nucleotide sequence' },
+      '69551-1': { label: 'ALT Allele', desc: 'Alternate (variant) nucleotide sequence' },
+      '53037-8': { label: 'Clinical Significance', desc: 'ClinVar clinical interpretation' },
+      '69548-6': { label: 'Variant Assessment', desc: 'Overall genetic variant assessment code' },
+      '81252-9': { label: 'Discrete Genetic Variant', 'desc': 'Discrete variant code (ClinVar ID)' },
+      '81255-2': { label: 'Amino Acid Change', desc: 'Predicted protein-level consequence' },
+      '48018-6': { label: 'Gene Studied', desc: 'HGNC gene symbol' }
+    };
+    const BUILD_MAP = { 'LA26806-2': 'GRCh38 / hg38', 'LA14029-5': 'GRCh37 / hg19' };
+    const SIG_ORDER = ['pathogenic', 'likely_pathogenic', 'uncertain_significance', 'likely_benign', 'benign', 'not_in_clinvar', 'lookup_error'];
 
-function getVal(comp) {
-  if (comp.valueString) return comp.valueString;
-  if (comp.valueCodeableConcept?.text) return comp.valueCodeableConcept.text;
-  if (comp.valueCodeableConcept?.coding?.[0]) {
-    const c = comp.valueCodeableConcept.coding[0].code;
-    return BUILD[c] || c;
-  }
-  if (comp.valueRange?.low?.value !== undefined) return Number(comp.valueRange.low.value).toLocaleString();
-  return '—';
-}
+    function getVal(comp) {
+      if (comp.valueString) return comp.valueString;
+      if (comp.valueCodeableConcept?.text) return comp.valueCodeableConcept.text;
+      if (comp.valueCodeableConcept?.coding?.[0]) {
+        const c = comp.valueCodeableConcept.coding[0].code;
+        return BUILD_MAP[c] || comp.valueCodeableConcept.coding[0].display || c;
+      }
+      if (comp.valueRange?.low?.value !== undefined) return Number(comp.valueRange.low.value).toLocaleString();
+      return '—';
+    }
 
-function sigClass(sig) {
-  return 'sig-' + (sig || '').replace(/ /g, '_').toLowerCase();
-}
+    function normSig(s) { return (s || 'not_in_clinvar').toLowerCase().replace(/[ \/]/g, '_'); }
+    function sigClass(s) { return 'sig-' + normSig(s); }
+    function sigLabel(s) { return (s || 'Not in ClinVar').replace(/_/g, ' '); }
 
-function render(report, reportId) {
-  const obs = report.contained || [];
-  const issued = report.issued ? new Date(report.issued).toLocaleString() : '—';
-  const sampleId = report.identifier?.[0]?.value || report.id;
-  const patientId = report.subject?.display || report.subject?.identifier?.value || '—';
-  const hapiBase = `https://hapi.fhir.org/baseR4/DiagnosticReport/${reportId}`;
+    function copyText(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓';
+        setTimeout(() => btn.textContent = '⧉', 1200);
+      });
+    }
 
-  const variantsHtml = obs.map((o, i) => {
-    const comps = o.component || [];
-    const sig = comps.find(c => c.code?.coding?.[0]?.code === '53037-8');
-    const sigVal = sig ? getVal(sig) : 'not_in_clinvar';
-    const statusBadge = o.status === 'final'
-      ? '<span class="badge badge-final">PASS</span>'
-      : '<span class="badge badge-prelim">LOW QUAL</span>';
+    function buildStats(obs) {
+      const counts = { total: obs.length, pass: 0, pathogenic: 0, vus: 0, benign: 0, noclinvar: 0 };
+      obs.forEach(o => {
+        const comps = o.component || [];
+        const sig = comps.find(c => c.code?.coding?.[0]?.code === '53037-8');
+        const sv = normSig(sig ? getVal(sig) : 'not_in_clinvar');
+        if (o.status === 'final') counts.pass++;
+        if (['pathogenic', 'likely_pathogenic'].includes(sv)) counts.pathogenic++;
+        else if (sv === 'uncertain_significance') counts.vus++;
+        else if (['benign', 'likely_benign'].includes(sv)) counts.benign++;
+        else if (sv === 'not_in_clinvar') counts.noclinvar++;
+      });
+      return counts;
+    }
 
-    const compItems = comps
-      .filter(c => c.code?.coding?.[0]?.code !== '53037-8')
-      .map(c => {
-        const code = c.code?.coding?.[0]?.code;
-        return `<div class="comp-item"><label>${LOINC[code] || code}</label><span>${getVal(c)}</span></div>`;
-      }).join('');
+    function renderVariant(o, i) {
+      const comps = o.component || [];
+      const sigComp = comps.find(c => c.code?.coding?.[0]?.code === '53037-8');
+      const sigVal = sigComp ? getVal(sigComp) : 'not_in_clinvar';
+      const sigN = normSig(sigVal);
+      const statusBadge = o.status === 'final'
+        ? '<span class="badge badge-final">PASS</span>'
+        : '<span class="badge badge-prelim">LOW QUAL</span>';
 
-    return `
-      <div class="variant">
-        <div class="variant-header">
-          <span class="variant-title">Variant ${i + 1}</span>
-          <div>
-            <span class="${sigClass(sigVal)}">${sigVal.replace(/_/g, ' ')}</span>
-            ${statusBadge}
+      let hlClass = '';
+      if (sigN === 'pathogenic') hlClass = 'highlight-path';
+      else if (sigN === 'likely_pathogenic') hlClass = 'highlight-lpath';
+      else if (['benign', 'likely_benign'].includes(sigN)) hlClass = 'highlight-benign';
+
+      // Extract rsID from observation id or variant component
+      const chromComp = comps.find(c => c.code?.coding?.[0]?.code === '47999-8');
+      const posComp = comps.find(c => c.code?.coding?.[0]?.code === '81254-5');
+      const refComp = comps.find(c => c.code?.coding?.[0]?.code === '69547-8');
+      const altComp = comps.find(c => c.code?.coding?.[0]?.code === '69551-1');
+      const chrom = chromComp ? getVal(chromComp) : '—';
+      const pos = posComp ? getVal(posComp) : '—';
+      const ref = refComp ? getVal(refComp) : '—';
+      const alt = altComp ? getVal(altComp) : '—';
+
+      // Try to extract rsID from observation id (var-SAMPLE-idx format doesn't have it)
+      // But we can reconstruct a ClinVar search link from chrom+pos
+      const clinvarLink = (chrom !== '—' && pos !== '—')
+        ? `https://www.ncbi.nlm.nih.gov/clinvar/?term=${chrom.replace('chr', '')}[chr]+${pos.replace(/,/g, '')}[chrpos38]`
+        : null;
+
+      const compItems = comps
+        .filter(c => c.code?.coding?.[0]?.code !== '53037-8')
+        .map(c => {
+          const code = c.code?.coding?.[0]?.code || '';
+          const info = LOINC_MAP[code] || { label: code, desc: '' };
+          const val = getVal(c);
+          return `
+        <div class="comp-item" title="${info.desc}">
+          <label>${info.label}<span class="loinc-code">${code}</span></label>
+          <span class="val">${val}</span>
+        </div>`;
+        }).join('');
+
+      const variantLabel = (chrom !== '—' && pos !== '—')
+        ? `${chrom} : ${pos}  ${ref} → ${alt}`
+        : `Variant ${i + 1}`;
+
+      return `
+    <div class="variant ${hlClass}" data-sig="${sigN}" data-chrom="${chrom}" data-pos="${pos}">
+      <div class="variant-header">
+        <div>
+          <div class="variant-title">${variantLabel}</div>
+          <div class="variant-rsid">
+            Observation ID: <code>${o.id || '—'}</code>
+            ${clinvarLink ? `· <a class="rsid-link" href="${clinvarLink}" target="_blank">Search ClinVar ↗</a>` : ''}
           </div>
         </div>
-        <div class="comp-grid">${compItems}</div>
-      </div>`;
-  }).join('');
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="${sigClass(sigVal)}" title="ClinVar Clinical Significance (LOINC 53037-8)">${sigLabel(sigVal)}</span>
+          ${statusBadge}
+        </div>
+      </div>
+      <div class="comp-grid">${compItems}</div>
+    </div>`;
+    }
 
-  document.getElementById('app').innerHTML = `
+    let allObservations = [];
+
+    function applyFilters() {
+      const search = document.getElementById('search-input')?.value.toLowerCase() || '';
+      const sigFilter = document.getElementById('sig-filter')?.value || 'all';
+      const statusFilter = document.getElementById('status-filter')?.value || 'all';
+
+      const container = document.getElementById('variants-container');
+      if (!container) return;
+
+      let visible = 0;
+      container.querySelectorAll('.variant').forEach(el => {
+        const sig = el.dataset.sig || '';
+        const chrom = el.dataset.chrom || '';
+        const pos = el.dataset.pos || '';
+        const text = el.innerText.toLowerCase();
+
+        const matchSearch = !search || text.includes(search);
+        const matchSig = sigFilter === 'all' || sig === sigFilter ||
+          (sigFilter === 'pathogenic_lp' && ['pathogenic', 'likely_pathogenic'].includes(sig));
+        const statusEl = el.querySelector('.badge');
+        const isFinal = statusEl?.classList.contains('badge-final');
+        const matchStatus = statusFilter === 'all' ||
+          (statusFilter === 'pass' && isFinal) ||
+          (statusFilter === 'lowqual' && !isFinal);
+
+        const show = matchSearch && matchSig && matchStatus;
+        el.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+
+      const countEl = document.getElementById('filter-count');
+      if (countEl) countEl.textContent = `Showing ${visible} of ${allObservations.length} variants`;
+
+      const nr = document.getElementById('no-results');
+      if (nr) nr.style.display = visible === 0 ? '' : 'none';
+    }
+
+    function render(report, reportId) {
+      allObservations = report.contained || [];
+
+      // Sort: pathogenic first
+      allObservations.sort((a, b) => {
+        const getSig = o => {
+          const c = (o.component || []).find(c => c.code?.coding?.[0]?.code === '53037-8');
+          return normSig(c ? getVal(c) : 'not_in_clinvar');
+        };
+        return SIG_ORDER.indexOf(getSig(a)) - SIG_ORDER.indexOf(getSig(b));
+      });
+
+      const stats = buildStats(allObservations);
+      const issued = report.issued ? new Date(report.issued).toLocaleString() : '—';
+      const sampleId = report.identifier?.[0]?.value || report.id || '—';
+
+      // Patient reference — check multiple FHIR locations
+      const subject = report.subject || {};
+      const patientId = subject.display
+        || subject.identifier?.value
+        || subject.reference?.replace('Patient/', '')
+        || '—';
+      const patientSys = subject.identifier?.system || subject.reference || '—';
+
+      const hapiBase = `https://hapi.fhir.org/baseR4/DiagnosticReport/${reportId}`;
+      const variantsHtml = allObservations.map((o, i) => renderVariant(o, i)).join('');
+
+      const loincRows = Object.entries(LOINC_MAP).map(([code, info]) => `
+    <tr>
+      <td class="code">${code}</td>
+      <td class="desc">${info.label}</td>
+      <td class="desc" style="color:#555">${info.desc}</td>
+    </tr>`).join('');
+
+      document.getElementById('app').innerHTML = `
     <div class="header">
-      <h1>🧬 Genomics Report <span class="badge badge-final">${report.status?.toUpperCase()}</span></h1>
-      <p>Master HL7 Genetic Variant Reporting Panel · LOINC 81247-9 · FHIR R4</p>
+      <h1>🧬 Genomics FHIR Report <span class="badge badge-final">${(report.status || '').toUpperCase()}</span></h1>
+      <p>Master HL7 Genetic Variant Reporting Panel · LOINC 81247-9 · FHIR R4 · HL7 Genomics Reporting IG</p>
       <div class="header-actions">
-        <a class="btn btn-primary" href="${hapiBase}?_format=json" target="_blank">📄 Raw JSON</a>
-        <a class="btn btn-secondary" href="${hapiBase}?_format=html" target="_blank">🔗 View on HAPI FHIR</a>
-        <a class="btn btn-muted" href="https://hapi.fhir.org/baseR4/DiagnosticReport/${reportId}" target="_blank">🏥 Original FHIR Report</a>
+        <a class="btn btn-primary"   href="${hapiBase}?_format=json" target="_blank">📄 Raw FHIR JSON</a>
+        <a class="btn btn-secondary" href="${hapiBase}?_format=html" target="_blank">🔗 HAPI FHIR Viewer</a>
+        <a class="btn btn-muted"     href="https://www.ncbi.nlm.nih.gov/clinvar/" target="_blank">🧪 ClinVar Database</a>
       </div>
     </div>
+
+    <!-- PATIENT PANEL -->
+    <div class="patient-panel">
+      <div class="patient-avatar">👤</div>
+      <div class="patient-info">
+        <label>Patient Reference (FHIR subject)</label>
+        <div class="pid">${patientId}</div>
+        <div class="psys">System: ${patientSys}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <label style="font-size:0.7em;color:#666;text-transform:uppercase;letter-spacing:.6px;">FHIR Report ID</label>
+        <div style="font-family:monospace;color:#7eb8f7;font-size:0.9em;">
+          ${reportId}
+          <button class="copy-btn" onclick="copyText('${reportId}', this)" title="Copy Report ID">⧉</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS BAR -->
+    <div class="stats-bar">
+      <div class="stat-card stat-total">
+        <div class="stat-value">${stats.total}</div>
+        <div class="stat-label">Total Variants</div>
+      </div>
+      <div class="stat-card stat-pass">
+        <div class="stat-value">${stats.pass}</div>
+        <div class="stat-label">PASS Filter</div>
+      </div>
+      <div class="stat-card stat-path">
+        <div class="stat-value">${stats.pathogenic}</div>
+        <div class="stat-label">Pathogenic / LP</div>
+      </div>
+      <div class="stat-card stat-vus">
+        <div class="stat-value">${stats.vus}</div>
+        <div class="stat-label">Uncertain (VUS)</div>
+      </div>
+      <div class="stat-card stat-benign">
+        <div class="stat-value">${stats.benign}</div>
+        <div class="stat-label">Benign / LB</div>
+      </div>
+      <div class="stat-card stat-noclinvar">
+        <div class="stat-value">${stats.noclinvar}</div>
+        <div class="stat-label">Not in ClinVar</div>
+      </div>
+    </div>
+
+    <!-- REPORT DETAILS -->
     <div class="card">
       <h2>Report Details</h2>
       <div class="meta-grid">
-        <div class="meta-item"><label>Sample ID</label><span>${sampleId}</span></div>
-        <div class="meta-item"><label>Patient</label><span>${patientId}</span></div>
-        <div class="meta-item"><label>Issued</label><span>${issued}</span></div>
-        <div class="meta-item"><label>HAPI Report ID</label><span>${reportId}</span></div>
-        <div class="meta-item"><label>Variants Found</label><span>${obs.length}</span></div>
-        <div class="meta-item"><label>Profile</label><span>HL7 Genomics Reporting IG</span></div>
+        <div class="meta-item">
+          <label>Sample ID</label>
+          <span>${sampleId} <button class="copy-btn" onclick="copyText('${sampleId}',this)">⧉</button></span>
+        </div>
+        <div class="meta-item">
+          <label>Patient ID</label>
+          <span>${patientId}</span>
+        </div>
+        <div class="meta-item">
+          <label>Issued</label>
+          <span>${issued}</span>
+        </div>
+        <div class="meta-item">
+          <label>FHIR Profile</label>
+          <span>HL7 Genomics Reporting IG</span>
+        </div>
+        <div class="meta-item">
+          <label>Report Code</label>
+          <span>LOINC 81247-9 <span class="tag">Master Variant Panel</span></span>
+        </div>
+        <div class="meta-item">
+          <label>Category</label>
+          <span>GE – Genetics <span class="tag">v2-0074</span></span>
+        </div>
       </div>
     </div>
+
+    <!-- VARIANTS -->
     <div class="card">
-      <h2>Variants (${obs.length})</h2>
-      ${variantsHtml || '<p style="color:#888">No variants found</p>'}
+      <h2>Variants (${allObservations.length}) — sorted by clinical significance</h2>
+      <div class="filter-bar">
+        <input id="search-input" type="text" placeholder="Search chromosome, position, allele..." oninput="applyFilters()" />
+        <select id="sig-filter" onchange="applyFilters()">
+          <option value="all">All Significance</option>
+          <option value="pathogenic_lp">Pathogenic / LP</option>
+          <option value="uncertain_significance">Uncertain (VUS)</option>
+          <option value="benign">Benign</option>
+          <option value="likely_benign">Likely Benign</option>
+          <option value="not_in_clinvar">Not in ClinVar</option>
+        </select>
+        <select id="status-filter" onchange="applyFilters()">
+          <option value="all">All Filters</option>
+          <option value="pass">PASS Only</option>
+          <option value="lowqual">Low Quality</option>
+        </select>
+        <span class="filter-count" id="filter-count">Showing ${allObservations.length} of ${allObservations.length} variants</span>
+      </div>
+      <div id="variants-container">
+        ${variantsHtml || '<p style="color:#888">No variants found</p>'}
+        <div id="no-results" class="no-results hidden">No variants match your filters.</div>
+      </div>
     </div>
+
+    <!-- LOINC REFERENCE -->
+    <div class="card">
+      <h2 class="section-toggle" onclick="document.getElementById('loinc-body').classList.toggle('hidden')">
+        📋 LOINC Code Reference <span style="font-size:0.8em;color:#555">(click to toggle)</span>
+      </h2>
+      <div id="loinc-body">
+        <table class="loinc-table">
+          <thead><tr><th>LOINC Code</th><th>Label</th><th>Description</th></tr></thead>
+          <tbody>${loincRows}</tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="footer">
       Generated by <a href="https://github.com" target="_blank">VCF → FHIR ETL Pipeline</a> ·
       Powered by <a href="https://hapi.fhir.org" target="_blank">HAPI FHIR R4</a> ·
-      <a href="${hapiBase}" target="_blank">Direct Report Link</a>
+      LOINC codes © <a href="https://loinc.org" target="_blank">Regenstrief Institute</a>
     </div>`;
-}
+    }
 
-async function load() {
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get('id');
-  if (!id) {
-    document.getElementById('app').innerHTML = '<div class="error">⚠️ No report ID provided. Use <code>?id=HAPI_REPORT_ID</code> in the URL.</div>';
-    return;
-  }
-  try {
-    const res = await fetch(`https://hapi.fhir.org/baseR4/DiagnosticReport/${id}?_format=json`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    render(await res.json(), id);
-  } catch (e) {
-    document.getElementById('app').innerHTML = `<div class="error">❌ Failed to load report: ${e.message}</div>`;
-  }
-}
-load();
-</script>
+    async function load() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) {
+        document.getElementById('app').innerHTML =
+          '<div class="error">⚠️ No report ID provided. Use <code>?id=HAPI_REPORT_ID</code> in the URL.</div>';
+        return;
+      }
+      try {
+        const res = await fetch(`https://hapi.fhir.org/baseR4/DiagnosticReport/${id}?_format=json`);
+        if (!res.ok) throw new Error(`HTTP ${res.status} — report not found on HAPI FHIR`);
+        render(await res.json(), id);
+      } catch (e) {
+        document.getElementById('app').innerHTML =
+          `<div class="error">❌ Failed to load report: ${e.message}</div>`;
+      }
+    }
+    load();
+  </script>
 </body>
+
 </html>
